@@ -24,10 +24,6 @@
 #include <linux/max17040_battery.h>
 #include <linux/slab.h>
 
-#include <linux/gpio.h>
-#include <linux/of.h>
-#include <linux/of_gpio.h>
-
 #define MAX17040_VCELL_MSB	0x02
 #define MAX17040_VCELL_LSB	0x03
 #define MAX17040_SOC_MSB	0x04
@@ -46,10 +42,14 @@
 
 #define REIMP 1
 
-#define MAX17049 1
-#define HAVE_CHARGE_PIN 1
+#define MAX17049 0
+#define HAVE_CHARGE_PIN 0
 
-
+#if HAVE_CHARGE_PIN
+#include <linux/gpio.h>
+#include <linux/of.h>
+#include <linux/of_gpio.h>
+#endif
 
 struct max17040_chip {
 	struct i2c_client		*client;
@@ -341,6 +341,7 @@ static void max17040_get_status(struct i2c_client *client)
 	}
 	else{
 		value=gpio_get_value(gpio_charge_pin);
+		/* this charge GPIO pin activate low */
 		if(value){
 			chip->status = POWER_SUPPLY_STATUS_NOT_CHARGING;
 		}
@@ -472,13 +473,16 @@ static int max17040_probe(struct i2c_client *client,
 		}
 		else {
 			printk("charger-pin %d\n",gpio_charge_pin);
+			ret=gpio_direction_input(gpio_charge_pin);
+			if(ret){
+				printk("set charger-pin as input error: %X\n",ret);
+				//gpio_free(gpio_charge_pin);
+				gpio_charge_pin=-1;
+				
+			}
 		}
-		ret=gpio_direction_input(gpio_charge_pin);
-		if(ret){
-			printk("set charger-pin as input error: %X\n",ret);
-			gpio_charge_pin=-1;
-		}
-		//ret = devm_gpio_request_one(&i2c->dev, es8316->hp_det_gpio, GPIOF_IN, "hp det");
+
+
 	}
 #endif
 
@@ -548,6 +552,6 @@ static struct i2c_driver max17040_i2c_driver = {
 };
 module_i2c_driver(max17040_i2c_driver);
 
-MODULE_AUTHOR("Minkyu Kang <mk7.kang@samsung.com>");
+MODULE_AUTHOR("modify: stephenLucien; origin: Minkyu Kang <mk7.kang@samsung.com>");
 MODULE_DESCRIPTION("MAX17040 Fuel Gauge");
 MODULE_LICENSE("GPL");
